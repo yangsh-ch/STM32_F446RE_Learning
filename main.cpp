@@ -1,21 +1,17 @@
 #include "mbed.h"
-#include "uart_debug.h"
-
-// 宣告 LED 腳位 (Nucleo 板上的綠色 LED)
-DigitalOut led(LED1);
+#include "uart_debug.h"    // Day 4
+#include "exti_control.h"  // Day 5
 
 int main() {
-    // 1. 初始化所有模組
-    uart_debug_init();
+    // 初始化
+    //uart_debug_init();
+    exti_init();
 
     while(1) {
-        // 2. 呼叫封裝好的 UART 函數
-        uart_send_log("Test\n");
+
+        // 每 500ms 執行一次硬體觸發
+        exti_generate_trigger();
         
-        // 3. LED 狀態閃爍
-        led = !led;
-        
-        // 閃爍頻率優化 (500ms)
-        ThisThread::sleep_for(500ms); 
+        ThisThread::sleep_for(500ms);
     }
 }
