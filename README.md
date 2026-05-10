@@ -1,72 +1,74 @@
-![](./resources/official_armmbed_example_badge.png)
-# Blinky Mbed OS example
+# STM32 F446RE Firmware Learning Journey
 
-The example project is part of the [Arm Mbed OS Official Examples](https://os.mbed.com/code/) and is the [getting started example for Mbed OS](https://os.mbed.com/docs/mbed-os/latest/quick-start/index.html). It contains an application that repeatedly blinks an LED on supported [Mbed boards](https://os.mbed.com/platforms/).
+> Hands-on embedded firmware development using STM32F446RE (NUCLEO-F446RE) with Mbed OS.
+> 
 
-You can build the project with all supported [Mbed OS build tools](https://os.mbed.com/docs/mbed-os/latest/tools/index.html). However, this example project specifically refers to the command-line interface tool [Arm Mbed CLI](https://github.com/ARMmbed/mbed-cli#installing-mbed-cli).
-(Note: To see a rendered example you can import into the Arm Online Compiler, please see our [import quick start](https://os.mbed.com/docs/mbed-os/latest/quick-start/online-with-the-online-compiler.html#importing-the-code).)
+> Focused on low-level peripheral control, interrupt-driven design, and digital power control — targeting server PSU firmware applications.
+> 
 
-## Mbed OS build tools
+## 🎯 Project Goal
 
-### Mbed CLI 2
-Starting with version 6.5, Mbed OS uses Mbed CLI 2. It uses Ninja as a build system, and CMake to generate the build environment and manage the build process in a compiler-independent manner. If you are working with Mbed OS version prior to 6.5 then check the section [Mbed CLI 1](#mbed-cli-1).
-1. [Install Mbed CLI 2](https://os.mbed.com/docs/mbed-os/latest/build-tools/install-or-upgrade.html).
-1. From the command-line, import the example: `mbed-tools import mbed-os-example-blinky`
-1. Change the current directory to where the project was imported.
+Bridge from communication-layer firmware (UART/PCIe/I2C) to **digital power control firmware** relevant to server infrastructure (PSU, data center).
 
-### Mbed CLI 1
-1. [Install Mbed CLI 1](https://os.mbed.com/docs/mbed-os/latest/quick-start/offline-with-mbed-cli.html).
-1. From the command-line, import the example: `mbed import mbed-os-example-blinky`
-1. Change the current directory to where the project was imported.
+## 🛠 Hardware Setup
 
-## Application functionality
+| Component | Model | Role |
+| --- | --- | --- |
+| MCU Board | NUCLEO-F446RE (Cortex-M4 @ 180MHz) | Main controller |
+| Logic Analyzer | — | Signal verification & timing measurement |
 
-The `main()` function is the single thread in the application. It toggles the state of a digital output connected to an LED on the board.
+## 📁 Repository Structure
 
-**Note**: This example requires a target with RTOS support, i.e. one with `rtos` declared in `supported_application_profiles` in `targets/targets.json` in [mbed-os](https://github.com/ARMmbed/mbed-os). For non-RTOS targets (usually with small memory sizes), please use [mbed-os-example-blinky-baremetal](https://github.com/ARMmbed/mbed-os-example-blinky-baremetal) instead.
+```
+STM32_F446RE_Learning/
+├── Day01_02_Blinky_UART/    # GPIO output + Serial debug
+├── Day03_GPIO/              # Digital input/output & debounce
+├── Day04_UART_Decode/       # UART capture with logic analyzer
+├── Day05_Interrupt/         # ISR design, latency measurement (170ms → <50µs)
+├── Phase2_PowerCtrl/        # [WIP] ADC + PWM + PID digital power control
+└── docs/waveforms/          # Logic analyzer screenshots
+```
 
-## Building and running
+## 📈 Progress Log
 
-1. Connect a USB cable between the USB port on the board and the host computer.
-1. Run the following command to build the example project and program the microcontroller flash memory:
+### ✅ Phase 1 — Core Peripherals (Complete)
 
-    * Mbed CLI 2
+| Day | Topic | Key Result |
+| --- | --- | --- |
+| Day 1-2 | Blinky + UART | GPIO output + `printf` debug via USB Serial |
+| Day 3 | GPIO I/O | Button polling + LED toggle with software debounce |
+| Day 4 | UART + Logic Analyzer | Captured TX waveform, decoded Start/Stop bits (9600 baud) |
+| Day 5 | Interrupt (EXTI) | **Reduced latency from 170ms (mechanical bounce) to <50µs (digital loopback)** — verified via logic analyzer |
 
-    ```bash
-    $ mbed-tools compile -m <TARGET> -t <TOOLCHAIN> --flash
-    ```
+### 🔄 Phase 2 — Digital Power Control (In Progress)
 
-    * Mbed CLI 1
+| Module | Topic | Status |
+| --- | --- | --- |
+| Day 6 | ADC voltage sampling | 🔄 In progress |
+| Day 7 | TIM + PWM output (100kHz) | ⏳ Planned |
+| Day 8 | PID closed-loop voltage control | ⏳ Planned |
+| Day 9 | PMBus (I2C) — READ_VOUT, STATUS_BYTE | ⏳ Planned |
 
-    ```bash
-    $ mbed compile -m <TARGET> -t <TOOLCHAIN> --flash
-    ```
+## 🔬 Key Technical Finding — Day 5
 
-Your PC may take a few minutes to compile your code.
+Measured interrupt latency under different conditions:
 
-The binary is located at:
-* **Mbed CLI 2** - `./cmake_build/mbed-os-example-blinky.bin`</br>
-* **Mbed CLI 1** - `./BUILD/<TARGET>/<TOOLCHAIN>/mbed-os-example-blinky.bin`
+| Trigger Source | Latency | Root Cause |
+| --- | --- | --- |
+| Mechanical button (BUTTON1) | 140~200ms | Mechanical bounce + Mbed OS debounce |
+| Disable Deep Sleep | ~141ms | Sleep wake-up overhead reduced slightly |
+| Digital loopback (D2→D3) | **10~50µs** | Pure hardware ISR, no physical bounce |
 
-Alternatively, you can manually copy the binary to the board, which you mount on the host computer over USB.
+> Insight: Mbed OS `InterruptIn` callback goes through RTOS dispatcher. For true µs-level response, direct CMSIS NVIC register control or bare-metal ISR is required.
+> 
 
-## Expected output
-The LED on your target turns on and off every 500 milliseconds.
+## 🔗 Detailed Learning Notes
 
+Full experiment logs with waveform screenshots: [Notion Page](https://www.notion.so/Schedule-2fa47542eba3800b8c26da6e06eb93e7?pvs=21)
 
-## Troubleshooting
-If you have problems, you can review the [documentation](https://os.mbed.com/docs/latest/tutorials/debugging.html) for suggestions on what could be wrong and how to fix it.
+## ⚙️ Build Environment
 
-## Related Links
-
-* [Mbed OS Stats API](https://os.mbed.com/docs/latest/apis/mbed-statistics.html).
-* [Mbed OS Configuration](https://os.mbed.com/docs/latest/reference/configuration.html).
-* [Mbed OS Serial Communication](https://os.mbed.com/docs/latest/tutorials/serial-communication.html).
-* [Mbed OS bare metal](https://os.mbed.com/docs/mbed-os/latest/reference/mbed-os-bare-metal.html).
-* [Mbed boards](https://os.mbed.com/platforms/).
-
-### License and contributions
-
-The software is provided under Apache-2.0 license. Contributions to this project are accepted under the same license. Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for more info.
-
-This project contains code from other projects. The original license text is included in those source files. They must comply with our license guide.
+- **IDE**: Keil Studio Cloud (Arm Mbed)
+- **OS**: Mbed OS 6
+- **Language**: C / C++
+- **Toolchain**: GNU Arm Embedded Toolchain
