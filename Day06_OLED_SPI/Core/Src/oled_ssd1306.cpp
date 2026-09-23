@@ -161,7 +161,7 @@ static void oled_set_cursor(uint8_t col, uint8_t page) {
 }
 
 void oled_draw_char(char c, uint8_t col, uint8_t page) {
-    if (c < 0x20 || c > 0x7B) c = ' ';  // replace unsupported chars with space
+    if (c < 0x20 || c > 0x7A) c = ' ';  // replace unsupported chars with space (font5x7 only defined up to 'z' = 0x7A; 0x7B was an off-by-one that read past the array)
     oled_set_cursor(col, page);
     const uint8_t* glyph = font5x7[c - 0x20];   // font table starts at 0x20 (space)
     for (int i = 0; i < 5; i++) oled_write_data(glyph[i]);  // 5 cols of pixel data per char

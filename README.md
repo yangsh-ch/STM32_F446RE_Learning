@@ -25,6 +25,7 @@ STM32_F446RE_Learning/
 ├── Day03_GPIO/              # Digital input/output & debounce
 ├── Day04_UART_Decode/       # UART capture with logic analyzer
 ├── Day05_Interrupt/         # ISR design, latency measurement (170ms → <50µs)
+├── Day06_OLED_SPI/          # SPI protocol + SSD1306 OLED text display driver
 ├── Phase2_PowerCtrl/        # [WIP] ADC + PWM + PID digital power control
 └── docs/waveforms/          # Logic analyzer screenshots
 ```
@@ -39,15 +40,16 @@ STM32_F446RE_Learning/
 | Day 3 | GPIO I/O | Button polling + LED toggle with software debounce |
 | Day 4 | UART + Logic Analyzer | Captured TX waveform, decoded Start/Stop bits (9600 baud) |
 | Day 5 | Interrupt (EXTI) | **Reduced latency from 170ms (mechanical bounce) to <50µs (digital loopback)** — verified via logic analyzer |
+| Day 6 | SPI + OLED (SSD1306) | Wrote SSD1306 driver from datasheet — init sequence, framebuffer paging, 5×7 bitmap font rendering over SPI |
 
 ### 🔄 Phase 2 — Digital Power Control (In Progress)
 
 | Module | Topic | Status |
 | --- | --- | --- |
-| Day 6 | ADC voltage sampling | 🔄 In progress |
-| Day 7 | TIM + PWM output (100kHz) | ⏳ Planned |
-| Day 8 | PID closed-loop voltage control | ⏳ Planned |
-| Day 9 | PMBus (I2C) — READ_VOUT, STATUS_BYTE | ⏳ Planned |
+| Day 7 | ADC voltage sampling | 🔄 In progress |
+| Day 8 | TIM + PWM output (100kHz) | ⏳ Planned |
+| Day 9 | PID closed-loop voltage control | ⏳ Planned |
+| Day 10 | PMBus (I2C) — READ_VOUT, STATUS_BYTE | ⏳ Planned |
 
 ## 🔬 Key Technical Finding — Day 5
 
@@ -68,7 +70,11 @@ Full experiment logs with waveform screenshots: [Notion Page](https://www.notion
 
 ## ⚙️ Build Environment
 
-- **IDE**: Keil Studio Cloud (Arm Mbed)
+- **Toolchain**: mbed-tools CLI + CMake + Ninja + GNU Arm Embedded Toolchain（目前使用 14.2 版）
 - **OS**: Mbed OS 6
 - **Language**: C / C++
-- **Toolchain**: GNU Arm Embedded Toolchain
+- **Host**: Windows，本地編譯（Keil Studio Cloud 已於 2026/07 關閉服務，改用本地 CLI 工具鏈）
+- **Build Script**: [`build-day-from-portfolio.ps1`](./build-day-from-portfolio.ps1) — 自動把指定 Day 的原始碼複製進純 ASCII 路徑的獨立編譯 workspace（Arm GCC 連結器在含中文字路徑下會出錯），編譯完自動偵測並燒錄到板子。需在 **PowerShell** 下執行：
+    ```powershell
+    powershell -ExecutionPolicy Bypass -File .\build-day-from-portfolio.ps1 -Day Day06_OLED_SPI
+    ```
