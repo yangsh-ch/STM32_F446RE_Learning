@@ -37,6 +37,8 @@ param(
 $ErrorActionPreference = "Stop"
 $AppTarget = "portfolio_build"
 $DayPath = Join-Path $PortfolioPath $Day
+$DayLeaf = Split-Path $Day -Leaf   # -Day 可以是巢狀路徑（例如 Phase2_AttitudeSensing/01_SPI_Optimization），
+                                    # 輸出檔名/log 只取最後一段，避免 output\ 底下要建巢狀資料夾
 $OutputDir = Join-Path $WorkspacePath "output"
 
 if (-not (Test-Path $DayPath)) {
@@ -55,7 +57,7 @@ function Write-Step($msg) { Write-Host "`n==> $msg" -ForegroundColor Cyan }
 # 每次執行獨立一份 log（帶時間戳記），收在 output\logs\，不會佔用根目錄空間
 $LogDir = Join-Path $OutputDir "logs"
 New-Item -ItemType Directory -Path $LogDir -Force | Out-Null
-$LogPath = Join-Path $LogDir "$Day`_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
+$LogPath = Join-Path $LogDir "$DayLeaf`_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
 Start-Transcript -Path $LogPath -IncludeInvocationHeader | Out-Null
 
 try {
@@ -78,6 +80,9 @@ Set-Location $WorkspacePath
 # 2. 清掉上一輪的原始碼，換成這次要編的 Day
 Write-Step "清空舊原始碼，複製 $Day"
 Remove-Item main.cpp, Core -Recurse -Force -ErrorAction SilentlyContinue
+# 上一輪複製到根目錄的其他 .cpp/.h 也要清掉，不然會被 CMake 的 GLOB 一起編進來
+Get-ChildItem $WorkspacePath -File | Where-Object Extension -in ".cpp", ".c", ".h" |
+    Remove-Item -Force
 
 $mainCandidates = Get-ChildItem $DayPath -Filter "*_main.cpp" -File
 if ($mainCandidates.Count -eq 0) { throw "$DayPath 底下找不到任何 *_main.cpp" }
@@ -103,6 +108,16 @@ Get-ChildItem $DayPath -File | Where-Object {
 if (Test-Path (Join-Path $DayPath "Core")) {
     Copy-Item (Join-Path $DayPath "Core") Core -Recurse -Force
 }
+
+# 把剛複製進來的原始碼時間戳記更新成現在。
+# Copy-Item 會保留原檔的修改時間，ninja 只看「原始碼是否比 .obj 新」決定要不要重編，
+# 切換 Day 時舊檔可能比上一輪留下的 .obj 還舊 → 被跳過、沿用別的 Day 的 .obj → 連結錯誤。
+# 只更新專案檔案，mbed-os 的快取不受影響。
+$now = Get-Date
+$appFiles = @(Get-ChildItem $WorkspacePath -File | Where-Object Extension -in ".cpp", ".c", ".h")
+if (Test-Path Core) { $appFiles += @(Get-ChildItem Core -Recurse -File) }
+$appFiles | ForEach-Object { $_.LastWriteTime = $now }
+Write-Host "已更新 $($appFiles.Count) 個原始碼的時間戳記，確保全部重新編譯" -ForegroundColor Green
 
 # 3. 產生 CMakeLists.txt（自動掃 workspace 裡的 .cpp/.h，排除 mbed-os/cmake_build）
 @"
@@ -133,7 +148,7 @@ target_link_libraries(`${APP_TARGET} mbed-os)
 mbed_set_post_build(`${APP_TARGET})
 "@ | Set-Content CMakeLists.txt -Encoding utf8
 
-# 4. 編譯（沒改到程式碼時 ninja 會直接沿用上次的 .bin，這是正常的，不用強迫重編）
+# 4. 編譯（專案原始碼每次都會重編；mbed-os 沿用快取，所以不會很慢）
 $builtBin = "cmake_build\$Target\develop\$Toolchain\$AppTarget.bin"
 
 Write-Step "編譯：mbed-tools compile -m $Target -t $Toolchain"
@@ -143,7 +158,7 @@ if ($LASTEXITCODE -ne 0 -or -not (Test-Path $builtBin)) {
 }
 
 # 5. 複製到 output\，檔名跟著 Day 走，不用去 cmake_build 深處挖
-$outBin = Join-Path $OutputDir "$Day.bin"
+$outBin = Join-Path $OutputDir "$DayLeaf.bin"
 Copy-Item $builtBin $outBin -Force
 
 Write-Host ""
