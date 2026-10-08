@@ -140,8 +140,8 @@ void oled_init() {
     oled_write_command(0x14); // Enable (0x10 = disable)
 
     oled_write_command(0x81); oled_write_command(0xFF); // Max contrast : 0xFF = max brightness
-    oled_write_command(0xA0); // Segment remap: normal left-right orientation
-    oled_write_command(0xC0); // COM scan: normal (top to bottom)
+    oled_write_command(0xA1); // Segment remap: column 127 -> SEG0 (mirror left-right)
+    oled_write_command(0xC8); // COM scan: remapped (bottom to top); with 0xA1 = rotate 180°
     oled_write_command(0xA6); // Normal display: bit 1 = pixel on, bit 0 = pixel off
     oled_write_command(0xAF); // Display on
 }

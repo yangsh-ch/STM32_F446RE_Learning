@@ -41,6 +41,14 @@ Day06_OLED_SPI/
 │       └── oled_ssd1306.cpp
 ```
 
+## 🛠 編譯與燒錄
+
+在專案根目錄 `STM32_F446RE_Learning/` 下用 **PowerShell** 執行 [`build-day-from-portfolio.ps1`](../build-day-from-portfolio.ps1)，編譯完會自動燒錄到板子：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\build-day-from-portfolio.ps1 -Day Day06_OLED_SPI
+```
+
 ## 🖥 顯示畫面
 
 實機接線與 OLED 實際輸出（128×64，三行文字，跟 `main.cpp` 內容逐字對應）：
