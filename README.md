@@ -26,7 +26,8 @@ STM32_F446RE_Learning/
 ├── Day04_UART_Decode/       # UART capture with logic analyzer
 ├── Day05_Interrupt/         # ISR design, latency measurement (170ms → <50µs)
 ├── Day06_OLED_SPI/          # SPI protocol + SSD1306 OLED text display driver
-├── Phase2_PowerCtrl/        # [WIP] ADC + PWM + PID digital power control
+├── Phase2_AttitudeSensing/  # [WIP] IMU/attitude track — SPI signal integrity, I2C+LSM6DS3, sensor fusion, tilt meter
+├── Phase3_PowerCtrl/        # [Planned] ADC + PWM + PID + PMBus digital power control
 └── docs/waveforms/          # Logic analyzer screenshots
 ```
 
@@ -42,14 +43,27 @@ STM32_F446RE_Learning/
 | Day 5 | Interrupt (EXTI) | **Reduced latency from 170ms (mechanical bounce) to <50µs (digital loopback)** — verified via logic analyzer |
 | Day 6 | SPI + OLED (SSD1306) | Wrote SSD1306 driver from datasheet — init sequence, framebuffer paging, 5×7 bitmap font rendering over SPI |
 
-### 🔄 Phase 2 — Digital Power Control (In Progress)
+### 🔄 Phase 2 — Attitude Sensing System (In Progress)
 
 | Module | Topic | Status |
 | --- | --- | --- |
-| Day 7 | ADC voltage sampling | 🔄 In progress |
-| Day 8 | TIM + PWM output (100kHz) | ⏳ Planned |
-| Day 9 | PID closed-loop voltage control | ⏳ Planned |
-| Day 10 | PMBus (I2C) — READ_VOUT, STATUS_BYTE | ⏳ Planned |
+| 01 | SPI signal integrity (1/4/8/16MHz) | ✅ Done — see [Phase2_AttitudeSensing/01_SPI_Optimization](Phase2_AttitudeSensing/01_SPI_Optimization/01_README.md) |
+| 02 | I2C + LSM6DS3 (6-axis IMU) | ⏳ Planned |
+| 03 | Sensor data processing (raw → g/dps) | ⏳ Planned |
+| 04 | Sensor + OLED integration | ⏳ Planned |
+| 05 | Tilt/attitude meter | ⏳ Planned |
+| 06 | TTP223 touch UI (page switching) | ⏳ Planned |
+| 07 | SPI DMA optimization | ⏳ Planned |
+| 08 | FreeRTOS (multi-task) | ⏳ Planned |
+
+### ⏳ Phase 3 — Digital Power Control (Planned)
+
+| Module | Topic | Status |
+| --- | --- | --- |
+| 01 | ADC voltage sampling + OVP protection | ⏳ Planned |
+| 02 | TIM + PWM output (100kHz) | ⏳ Planned |
+| 03 | PID closed-loop voltage control | ⏳ Planned |
+| 04 | PMBus (I2C) — READ_VOUT, STATUS_BYTE | ⏳ Planned |
 
 ## 🔬 Key Technical Finding — Day 5
 
