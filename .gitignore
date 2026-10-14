@@ -2,6 +2,7 @@
 .mbed
 projectfiles
 *.py*
+!Phase2_AttitudeSensing/01_SPI_Optimization/tools/spi_compare.py
 BUILD
 compile_commands.json
 .clangd
