@@ -120,7 +120,7 @@ void oled_write_data(uint8_t data) {
 }
 
 void oled_init() {
-    spi.frequency(1000000); // 1MHz: baseline known-good speed from Day06
+    oled_set_spi_frequency(1000000); // 1MHz: baseline known-good speed from Day06
 
     // Hardware reset: clears all internal registers to default state
     oled_res = 0;
@@ -150,6 +150,13 @@ void oled_set_spi_frequency(uint32_t hz) {
     // Only changes the host's SCLK rate; SSD1306 internal state is untouched,
     // so no need to re-run oled_init() when switching speeds mid-run.
     spi.frequency(hz);
+
+    // After re-configuring, SCLK is left high until the first transfer, so the
+    // next real byte would start from the wrong idle level (logic analyzer drops
+    // it as "idle state mismatch"). Clock one dummy byte with CS high: the OLED
+    // ignores the bus, and SCLK is back to its Mode 0 idle-low afterwards.
+    oled_cs = 1;                    // DigitalOut defaults to 0, so set it explicitly
+    spi.write(0x00);
 }
 
 void oled_clear() {
