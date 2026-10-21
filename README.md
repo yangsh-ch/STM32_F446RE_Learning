@@ -48,7 +48,7 @@ STM32_F446RE_Learning/
 | Module | Topic | Status |
 | --- | --- | --- |
 | 01 | SPI signal integrity (1/4/8/16MHz) | ✅ Done — see [Phase2_AttitudeSensing/01_SPI_Optimization](Phase2_AttitudeSensing/01_SPI_Optimization/01_README.md) |
-| 02 | I2C + LSM6DS3 (6-axis IMU) | ⏳ Planned |
+| 02 | I2C + LSM6DS3 (6-axis IMU) | ✅ Done — see [Phase2_AttitudeSensing/02_I2C_LSM6DS3](Phase2_AttitudeSensing/02_I2C_LSM6DS3/02_README.md) |
 | 03 | Sensor data processing (raw → g/dps) | ⏳ Planned |
 | 04 | Sensor + OLED integration | ⏳ Planned |
 | 05 | Tilt/attitude meter | ⏳ Planned |
