@@ -79,28 +79,24 @@ Phase2_AttitudeSensing/02_I2C_LSM6DS3/
 powershell -ExecutionPolicy Bypass -File .\build-day-from-portfolio.ps1 -Day Phase2_AttitudeSensing/02_I2C_LSM6DS3
 ```
 
-**讀取執行結果**：程式只在開機時跑一次，按 RESET 後會從 ST-LINK 虛擬 COM port 印出 4 行結果（掃描到的位址、`WHO_AM_I`、寫入後讀回，見上方「結果」）。到「裝置管理員 → 連接埠 (COM 和 LPT)」找 ST-Link 的 COM 編號，在 PowerShell 貼上下面這段（COM5 換成查到的編號），再按板子 RESET；要結束按 Ctrl+C。用邏輯分析儀擷取前要先停掉監聽（見解法 ②）。
+**讀取執行結果**：程式只在開機時跑一次，按 RESET 後會從 ST-LINK 虛擬 COM port 印出 4 行結果（掃描到的位址、`WHO_AM_I`、寫入後讀回，見上方「結果」）。用根目錄的 [`serial-monitor.ps1`](../../serial-monitor.ps1)（會自動找 ST-LINK 的 COM port），這一版是 **9600 baud**，要加 `-Baud 9600`；執行後按板子 RESET，要結束按 Ctrl+C。用邏輯分析儀擷取前要先停掉監聽（見解法 ②）。
 
 ```powershell
-$p = New-Object System.IO.Ports.SerialPort COM5,9600,None,8,One
-$p.Open()
-Write-Host "監聽 COM5 @ 9600，按板子 RESET；要結束請按 Ctrl+C"
-try { while ($true) { $s = $p.ReadExisting(); if ($s) { Write-Host -NoNewline $s }; Start-Sleep -Milliseconds 100 } } finally { $p.Close() }
+powershell -ExecutionPolicy Bypass -File .\serial-monitor.ps1 -Baud 9600
 ```
 
 ## 💡 學到的關鍵概念
 
-| 概念 | 說明 |
+| 重點 | 做法與結果 |
 | --- | --- |
-| 位址 byte | 線上的 byte = (7-bit 位址 << 1) \| R/W；0x6B → 寫 0xD6、讀 0xD7（datasheet Table 11） |
-| 保留位址 | 0x00～0x07、0x78～0x7F 保留給特殊用途（UM10204 Table 4），所以只掃 0x08～0x77 |
-| 讀暫存器 | 先寫暫存器位址設定指標，再用 Repeated START 讀；指標沒設好就會讀到別的暫存器 |
-| 寫入測試要避開預設值 | 預設值 0x00 寫入失敗也會讀回 0x00，看不出差別；也要避開 `CTRL4_C` 的 `I2C_disable` 這類會切斷通訊的位元 |
-| mbed API 回傳值 | 單 byte 版 `write(int)`：1 = ACK；完整版 `write()`／`read()`：0 = 成功 |
-| 混用 API 的狀態殘留 | 單 byte 版與完整版 API 對硬體旗標的處理不同，切換時要注意前一筆留下的狀態 |
+| 用 ACK／NACK 縮小故障範圍 | 掃描有 ACK → 接線、位址沒問題；`WHO_AM_I` 失敗但暫存器讀寫正常 → 問題在軟體狀態，不在硬體 |
+| 從波形追到驅動原始碼 | `WHO_AM_I` 讀到 0x00：波形顯示 START 後 17 µs 就 STOP，追進 mbed／HAL 原始碼，找到掃描 NACK 留下的 AF 旗標，清除後修正 |
+| 先實測再寫 driver | Address Scan 確認位址 0x6B（掃 0x08～0x77，避開 UM10204 保留位址），`WHO_AM_I` 確認晶片是 LSM6DS3 |
+| 寫入測試要能分辨成敗 | 避開預設值 0x00（失敗也讀回 0x00），也避開 `I2C_disable` 這類會切斷通訊的位元 |
+| 時序對照規格 | 100kHz／400kHz 的 tLOW、tHIGH 都在 UM10204 規格內；由 pull-up 10 kΩ 推算 400kHz 線上電容需 < 35 pF |
 
 ## 🔗 與其他 Day / 專案的連結
 
 - **← Phase 2-01**：沿用「從程式推算預期 → LA 實測 → 對照」的驗證流程，以及「第 1 → 第 8 上升緣」等量測經驗
 - **← Day4**：UART 除錯輸出的概念；這次 `printf` 改走 ST-LINK 虛擬 COM port
-- **→ Phase 2-03**：在已確認的位址與讀寫函式上，讀取加速度／陀螺儀原始值並換算成 g、dps
+- **→ [Phase 2-03](../03_Sensor_Processing/03_README.md)**：在已確認的位址與讀寫函式上，讀取加速度／陀螺儀原始值並換算成 mg、mdps

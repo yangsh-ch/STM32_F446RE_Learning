@@ -1,10 +1,7 @@
 # STM32 F446RE Firmware Learning Journey
 
 > Hands-on embedded firmware development using STM32F446RE (NUCLEO-F446RE) with Mbed OS.
-> 
-
 > Focused on low-level peripheral control, interrupt-driven design, and digital power control — targeting server PSU firmware applications.
-> 
 
 ## 🎯 Project Goal
 
@@ -15,7 +12,9 @@ Bridge from communication-layer firmware (UART/PCIe/I2C) to **digital power cont
 | Component | Model | Role |
 | --- | --- | --- |
 | MCU Board | NUCLEO-F446RE (Cortex-M4 @ 180MHz) | Main controller |
-| Logic Analyzer | — | Signal verification & timing measurement |
+| IMU Module | GY-LSM6DS3 (6-axis accel + gyro, I²C) | Attitude sensing (Phase 2) |
+| OLED Display | SSD1306 128×64 (SPI) | Text / data display (Day 6, Phase 2) |
+| Logic Analyzer | 8-channel, 24 MS/s | Signal verification & timing measurement |
 
 ## 📁 Repository Structure
 
@@ -65,22 +64,18 @@ STM32_F446RE_Learning/
 | 03 | PID closed-loop voltage control | ⏳ Planned |
 | 04 | PMBus (I2C) — READ_VOUT, STATUS_BYTE | ⏳ Planned |
 
-## 🔬 Key Technical Finding — Day 5
+## 🔬 Key Technical Findings
 
-Measured interrupt latency under different conditions:
-
-| Trigger Source | Latency | Root Cause |
+| Module | Finding | How it was verified |
 | --- | --- | --- |
-| Mechanical button (BUTTON1) | 140~200ms | Mechanical bounce + Mbed OS debounce |
-| Disable Deep Sleep | ~141ms | Sleep wake-up overhead reduced slightly |
-| Digital loopback (D2→D3) | **10~50µs** | Pure hardware ISR, no physical bounce |
-
-> Insight: Mbed OS `InterruptIn` callback goes through RTOS dispatcher. For true µs-level response, direct CMSIS NVIC register control or bare-metal ISR is required.
-> 
+| Day 5 | Button latency of 140~200ms came from mechanical bounce + Mbed OS debounce, not the ISR; a digital loopback responds in **10~50µs** | Logic analyzer |
+| Phase 2-01 | All 7,759 SPI bytes reached the OLED correctly; the 16MHz setting actually runs at 11.25MHz, below the SSD1306 t_cycle minimum | Byte-by-byte compare tool (`spi_compare.py`) |
+| Phase 2-02 | `WHO_AM_I` read 0x00 because the NACKed last scan probe left the I2C AF flag set; clearing it fixed the next transfer | Before/after captures + mbed/HAL source |
+| Phase 2-03 | Accel/gyro conversion validated against gravity: sensitivity error < 0.5%, offsets ≤ 14 mg | Six-orientation test + manual decode of a 12-byte burst |
 
 ## 🔗 Detailed Learning Notes
 
-Full experiment logs with waveform screenshots: [Notion Page](https://www.notion.so/Schedule-2fa47542eba3800b8c26da6e06eb93e7?pvs=21)
+Full experiment logs with waveform screenshots: [Notion Page](https://www.notion.so/Learn-MCU-Schedule-Share-35a47542eba38050b252e5241dd0e5c1)
 
 ## ⚙️ Build Environment
 

@@ -1,60 +1,29 @@
-# 學習目標
+# Day 3：GPIO 輸入輸出與軟體 Debounce
 
-- 使用 `DigitalIn` 讀取按鈕狀態（Polling）
-- 依按鈕輸入控制 LED toggle
-- 理解機械按鈕彈跳（Bounce）問題，並實作軟體 Debounce
-- 透過 UART 輸出 LED 狀態變化紀錄
+## 📊 總覽
 
----
-
-# Debounce 設計說明
-
-採用三段式軟體 Debounce，防止一次按壓觸發多次 toggle：
-
-```
-按下偵測（button == 0）
-    ↓
-執行 toggle + printf
-    ↓
-sleep 50ms（按下防彈跳）
-    ↓
-等待按鈕放開（while(button == 0)）
-    ↓
-sleep 50ms（放開防彈跳）
-    ↓
-回到 while(1) 繼續 Polling
-```
-
-| 步驟 | 目的 |
+| 項目 | 內容 |
 | --- | --- |
-| 按下後 sleep 50ms | 忽略按下瞬間的機械彈跳雜訊 |
-| `while(button == 0)` | 等待放開，防止持續觸發 |
-| 放開後 sleep 50ms | 忽略放開瞬間的機械彈跳雜訊 |
+| 目的 | 用 `DigitalIn` Polling 讀按鈕、控制 LED toggle，並處理機械按鈕彈跳 |
+| 結果 | ✅ 每按一次 LED 只 toggle 一次（不連跳），UART 輸出 `LED is now ON` / `LED is now OFF` |
+| 發現 | BUTTON1 是 **Active Low**：按下讀到 0、放開讀到 1 |
 
----
+## 🔧 三段式軟體 Debounce
 
-# 驗證結果
+| 步驟 | 做法 | 目的 |
+| --- | --- | --- |
+| ① | 偵測到按下（`button == 0`）→ toggle 並輸出 → `sleep 50ms` | 忽略按下瞬間的彈跳 |
+| ② | `while (button == 0)` | 等放開，避免按住時連續觸發 |
+| ③ | 放開後 `sleep 50ms` | 忽略放開瞬間的彈跳 |
 
-- 每次按下按鈕，LED 正確 toggle 一次（不會連跳）
-- UART 輸出對應狀態：`LED is now ON` / `LED is now OFF`
-- BUTTON1 為 **Active Low**：按下時讀到 `0`，放開時讀到 `1`
+## 💡 學到的重點
 
----
-
-# 學到的關鍵概念
-
-| 概念 | 說明 |
+| 重點 | 說明 |
 | --- | --- |
-| `DigitalIn` | GPIO 輸入讀取 |
-| Active Low | BUTTON1 按下為低電位（0），與直覺相反 |
-| 軟體 Debounce | 三段式延遲防止機械彈跳誤觸 |
-| Polling 的限制 | `while(1)` 持續佔用 CPU，無法做其他事 |
+| Active Low | 按下為 0，判斷條件要反過來寫 |
+| 軟體 Debounce | 用延遲濾掉機械彈跳，一次按壓只觸發一次 |
+| Polling 的代價 | `while(1)` 一直佔用 CPU，等按鈕時不能做別的事 |
 
----
+## 🔗 與其他 Day 的連結
 
-# 與 Day 5 的連結
-
-此程式的 Polling 架構在 Day 5 被中斷（Interrupt）取代：
-
-- **Polling**：CPU 一直主動檢查 → 浪費資源
-- **Interrupt**：事件發生才通知 CPU → 效率更高，延遲更低
+- **→ Day 5**：Polling 改成中斷（Interrupt），事件發生才通知 CPU

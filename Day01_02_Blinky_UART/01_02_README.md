@@ -1,36 +1,25 @@
-# 學習目標
+# Day 1-2：開發環境建立與 Blinky + UART Debug
 
-- 建立 Mbed OS 開發環境（Keil Studio Cloud）
-- 使用 `DigitalOut` 控制 LED 閃爍
-- 使用 `printf` 與 `BufferedSerial` 輸出 UART debug 訊息
-- 驗證開發板與電腦的 USB Serial 通訊
+## 📊 總覽
 
----
-
-# 實作版本
-
-| 版本 | 重點 |
+| 項目 | 內容 |
 | --- | --- |
-| 實作一：Blinky | `myled = 1/0`，`thread_sleep_for(500)` |
-| 實作二：BufferedSerial + Toggle | `myled = !myled`，`ThisThread::sleep_for(1000ms)`，`static BufferedSerial` |
+| 目的 | 建立 Mbed OS 6 開發流程：編譯 → 燒錄 → 執行 → 看到輸出 |
+| 實作 | `DigitalOut` 控制 LED 閃爍；`BufferedSerial` + `printf` 從 USB 虛擬 COM port 輸出訊息 |
+| 結果 | ✅ LED 依設定週期閃爍；Serial Monitor（115200 baud）收到輸出 |
+| 環境 | 當時使用 Keil Studio Cloud；該服務 2026/07 關閉後改用本地 CLI 工具鏈（見根目錄 README） |
 
-> 兩者等效，實作二更接近 Mbed OS 6 的正式寫法。
-> 
+## 🧩 兩個版本
 
----
-
-# 驗證結果
-
-- LED 以對應週期正常閃爍
-- Serial Monitor（115200 baud）收到對應輸出訊息
-- 開發環境確認可正常編譯、燒錄、執行
-
----
-
-# 學到的關鍵概念
-| 概念 | 說明 |
+| 版本 | 寫法 |
 | --- | --- |
-| `DigitalOut` | GPIO 輸出控制 |
-| `BufferedSerial` | 非同步 UART 緩衝傳輸，取代舊版 `Serial` |
-| `thread_sleep_for` vs `ThisThread::sleep_for` | 兩者等效，後者為 Mbed OS 6 推薦語法 |
-| `printf` debug | 最快速的韌體除錯方式，輸出走 USB Virtual COM Port |
+| 實作一：Blinky | `myled = 1/0`、`thread_sleep_for(500)` |
+| 實作二：Toggle + UART | `myled = !myled`、`ThisThread::sleep_for(1000ms)`、`static BufferedSerial`（Mbed OS 6 建議寫法） |
+
+## 💡 學到的重點
+
+| 重點 | 說明 |
+| --- | --- |
+| 先打通工具鏈 | 確認編譯、燒錄、執行、輸出整條流程可用，後續實驗都建立在這上面 |
+| `printf` 是最快的除錯管道 | 走 USB 虛擬 COM port，不用額外接線 |
+| 使用 Mbed OS 6 API | `BufferedSerial` 取代舊版 `Serial`，`ThisThread::sleep_for` 取代 `thread_sleep_for` |

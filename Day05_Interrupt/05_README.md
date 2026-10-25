@@ -17,14 +17,16 @@
 - **Loopback 驗證**：改用 D2 數位輸出觸發 D3 中斷，排除機械因素，延遲降至 µs 等級
 
 ## 📁 檔案結構
-Day05_Interrupt/
 
+```
+Day05_Interrupt/
 ├── main.cpp              # Loopback Test 版本
-├── Core/
-│   ├── Inc/
-│   │   └── exti_control.h
-│   └── Src/
-│       └── exti_control.cpp
+└── Core/
+    ├── Inc/
+    │   └── exti_control.h
+    └── Src/
+        └── exti_control.cpp
+```
 
 
 ## 🌊 波形截圖
@@ -47,7 +49,6 @@ Day05_Interrupt/
 
 ## 🔗 PSU 韌體應用連結
 
-此實驗對應伺服器電源供應器（PSU）韌體中的 **OVP/OCP 中斷保護**：
-電源異常 → 硬體觸發中斷 → µs 內關閉 PWM 輸出 → 保護電路
+此實驗對應伺服器電源供應器（PSU）韌體中的 **OVP/OCP 中斷保護**：電源異常 → 硬體觸發中斷 → µs 內關閉 PWM 輸出 → 保護電路
 
-→ Phase 2 將實作 ADC 取樣 + PWM 控制，與此中斷機制整合
+- **→ Phase 3**：實作 ADC 取樣與 PWM 控制時，整合這套中斷機制
