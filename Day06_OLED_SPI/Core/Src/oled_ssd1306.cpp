@@ -1,7 +1,10 @@
 #include "oled_ssd1306.h"
 
-// Define SPI(MOSI, MISO(NC), SCLK)
-static SPI spi(PA_7, NC, PA_5);
+// Define SPI(MOSI, MISO, SCLK)
+// MISO must not be NC: mbed then uses 1-line mode, and HAL disables and
+// re-enables SPI around every byte (the OLED stayed blank without LA probes).
+// PA_6 (D12) is left unconnected.
+static SPI spi(PA_7, PA_6, PA_5);
 static DigitalOut oled_cs(PB_10);
 static DigitalOut oled_dc(PB_1);
 static DigitalOut oled_res(PB_0);
