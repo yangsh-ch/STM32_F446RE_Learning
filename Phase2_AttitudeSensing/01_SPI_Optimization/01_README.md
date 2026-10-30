@@ -5,11 +5,11 @@
 | 項目 | 內容 |
 | --- | --- |
 | 目的 | 在杜邦線飛線的接法下，實測提高 SPI 頻率後資料是否仍正確，並對照 SSD1306 datasheet 驗證時序 |
-| 硬體 | 沿用 Day6 的 OLED 接線（PA_7 MOSI / PA_5 SCLK / PB_10 CS / PB_1 DC / PB_0 RES），另將 UART TX（PA_9）接到邏輯分析儀 |
+| 硬體 | 沿用 Day6 的 OLED 接線（PA_7 MOSI / PA_5 SCLK / PB_10 CS / PB_1 DC / PB_0 RES），另將 UART TX（PA_9）接到邏輯分析儀；SPI 的 MISO 指定 PA_6（D12 不接線），讓 mbed 用雙線模式 |
 | 測試方式 | 單次燒錄，依序切換 1→4→8→16MHz；每段先清屏、畫四行字，再從 PA_9 送出 `[SPI] <Hz> Hz, cycle <N>` 標籤，接著閒置 5 秒 |
 | 量測 | Saleae Logic 2，24 MS/s；SPI Analyzer 的 MISO 設為 DC（CH3），解碼表直接標出每個 byte 是指令還是資料 |
 | 驗證方式 | [`tools/spi_compare.py`](tools/spi_compare.py) 從原始碼推算每個 byte 應該送什麼，與邏輯分析儀匯出的 CSV 逐 byte 比對 |
-| 結果 | 7,759 個 byte 全部正確到達 OLED；分析儀漏解碼的問題用 dummy byte 修正（每段缺少 1 → 0）；16MHz 設定（實際 11.25MHz）已低於 datasheet t_cycle 下限 |
+| 結果 | 接著邏輯分析儀時 7,759 個 byte 全部正確到達 OLED；不接時原本的單線模式（MISO = NC）OLED 不顯示，改成雙線後正常，分析儀看到的窄脈衝也消失；16MHz 設定（實際 11.25MHz）已低於 datasheet t_cycle 下限 |
 
 ## 🔍 結果
 
@@ -41,10 +41,12 @@
 
 | # | 現象 | 根因 | OLED 有受影響嗎 |
 | --- | --- | --- | --- |
-| ① | 每段約 25～29% 的 byte 解碼值 = `0x80 \| (預期 >> 1)`（例：`0x8D`→`0xC6`） | byte 開頭有一根約一個取樣點寬的窄 SCLK 脈衝，被分析儀多算成第 1 個 bit（9 根脈衝、8 個 ▲）；用 8 根正常 clock 手動解碼為正確值。比例會隨 USB 連接狀態變動（見下方觀察）；窄脈衝的來源**未確定** | 否：開機畫面有亮（`0x8D` 有收到）、清屏後沒有虛線 |
-| ② | 每次 `spi.frequency()` 後的第一個 byte 沒被解碼（init 的 `0xAE`、每段清屏的 `0x21`） | 改頻率後 SCLK 停在高電位，CS 拉低時不符合 Mode 0 的閒置低電位，分析儀判定 idle state mismatch 而放棄解碼；手動解碼為 `0x21`，MCU 有送 | 否：畫面沒有錯位 |
+| ① | 每段約 25～29% 的 byte 解碼值 = `0x80 \| (預期 >> 1)`（例：`0x8D`→`0xC6`） | byte 開頭有一根約一個取樣點寬的窄 SCLK 脈衝，被分析儀多算成第 1 個 bit（9 根脈衝、8 個 ▲）；用 8 根正常 clock 手動解碼為正確值。**只在單線模式出現**：HAL 每傳一個 byte 就先關 SPI 再重開；比例會隨 USB 連接狀態變動（見下方觀察） | 接著 LA 時否：開機畫面有亮（`0x8D` 有收到）、清屏後沒有虛線 |
+| ② | 每次 `spi.frequency()` 後的第一個 byte 沒被解碼（init 的 `0xAE`、每段清屏的 `0x21`） | 改頻率後 SCLK 停在高電位，CS 拉低時不符合 Mode 0 的閒置低電位，分析儀判定 idle state mismatch 而放棄解碼；手動解碼為 `0x21`，MCU 有送。`spi.frequency()` 會重新初始化 SPI，單線模式要等下一次傳輸才重開 SPI，SCLK 就一直高到那時 | 否：畫面沒有錯位 |
+| ③ | 不接邏輯分析儀時 OLED 不顯示（Day6 同樣的問題） | MISO = NC 時 mbed 用單線模式（見 ①②）；改成雙線就正常 | 是：單線版 RESET 5 次都不顯示 |
 
-- **解法 ②（已驗證）**：`oled_set_spi_frequency()` 改完頻率後，先在 CS 為高的狀態下送一個 dummy byte，讓 SCLK 回到閒置低電位；`oled_init()` 也改走同一個函式。CS 要先明確拉高，因為 `DigitalOut oled_cs(PB_10)` 開機預設是 0
+- **解法 ②（單線模式時的解法，已驗證）**：`oled_set_spi_frequency()` 改完頻率後，先在 CS 為高的狀態下送一個 dummy byte，讓 SCLK 回到閒置低電位；`oled_init()` 也改走同一個函式。CS 要先明確拉高，因為 `DigitalOut oled_cs(PB_10)` 開機預設是 0
+- **解法 ③（已驗證，目前的程式）**：SPI 的 MISO 指定 PA_6（D12 不接線），改成雙線模式。窄脈衝消失、不接 LA 也能顯示；SCLK 在改頻率後約 0.58µs 自己回到低電位，所以拿掉了 dummy byte
 
 ### 解法 ② 驗證（[`captures/20261015_fix_*`](captures/20261015_fix_report.md)）
 
@@ -72,15 +74,31 @@
 | fix5 | 修改後 | 拔插 USB | **0** | 17～19% |
 
 - **缺少**：修改後 5 次都是 0，修改前 3 次都是每段 1（開機段 2），來回切換版本都能重現 → 解法 ② 確定有效
-- **shift1 比例**：跟程式版本、SPI 頻率無關，會隨 USB 拔插改變（4 次拔插有 3 次明顯變動）；窄脈衝的來源仍未確定
+- **shift1 比例**：跟程式版本、SPI 頻率無關，會隨 USB 拔插改變（4 次拔插有 3 次明顯變動）；以上都是單線模式的擷取
+
+### 單線 vs 雙線（[`captures/20261030_*`](captures/20261030_2line_nodummy_report.md)）
+
+同一組接線，只換程式。
+
+| 項目 | 單線 | 雙線 | 雙線、不送 dummy byte |
+| --- | --- | --- | --- |
+| 不接 LA：RESET 5 次 | ❌ 都不顯示 | ✅ | ✅ |
+| 不接 LA：1/4/8/16MHz 兩輪 | — | ✅ | ✅ |
+| 接 LA：shift1（cycle 0 每段） | 977～1077 | 0 | 0 |
+| 接 LA：9 根脈衝的 byte | 等於 shift1 筆數 | 0 | 0 |
+| 接 LA：缺少 | 0 | 0 | 0 |
+| 換頻率時 SCLK 變高 | 約 6.6µs（到 dummy byte 開始傳） | 約 0.58µs | 約 0.58µs |
+
+- 窄脈衝寬 ≤ 1 個取樣點（≤42ns），四個頻率都一樣；SPI 關閉時 SCLK 為什麼會變高還**未確定**，要看電壓波形需要示波器
 
 ## ✅ 結論
 
-- 四個頻率下，程式送出的 byte **全部正確到達 OLED**；邏輯分析儀看到的錯誤都來自分析儀本身的解碼
+- 四個頻率下，接著邏輯分析儀時程式送出的 byte **全部正確到達 OLED**；不接時單線模式的 OLED 不顯示，改成雙線後正常
+- 分析儀看到的窄脈衝只在單線模式出現
 - 原本預期的「漸進式劣化」沒有出現；不過實際測試的最高頻率只超出上限約 12%，不是規劃時以為的 60%
 - 16MHz 設定（實際 11.25MHz）已低於 datasheet 的 t_cycle 下限：這組硬體能動，但不在規格保證範圍內
 - 規格內最快的是 8MHz 設定（實際 5.63MHz）；但每個 byte 有約 9～10µs 的固定軟體開銷，byte 週期只從 20.0µs 縮短到 11.0µs
-- 分析儀「缺少 byte」的問題（根因 ②）已用 dummy byte 解決，修改後 5 段的「缺少」都是 0
+- 分析儀「缺少 byte」的問題（根因 ②）已用 dummy byte 解決，修改後 5 段的「缺少」都是 0；改成雙線後不需要 dummy byte
 - **限制**：24 MS/s 的邏輯分析儀只看得到 0/1，看不到邊緣與振鈴等類比波形；要評估訊號完整性的餘裕需要示波器
 
 ## 🔬 比對工具 `tools/spi_compare.py`
@@ -115,7 +133,11 @@ Phase2_AttitudeSensing/01_SPI_Optimization/
     ├── 20261012_report.md      # spi_compare.py 的比對報告
     ├── 20261015_fix_*          # 解法 ② 修改後的擷取（spi.csv / uart.csv / report.md）
     ├── 20261015_fix2～fix5_*   # 修改後的重複擷取（fix4、fix5 前拔插 USB）
-    └── 20261015_recover_test_* # 燒回修改前版本的擷取
+    ├── 20261015_recover_test_* # 燒回修改前版本的擷取
+    ├── 20261030_1line_*        # 單線模式（MISO = NC）
+    ├── 20261030_2line_*        # 雙線模式（含 dummy byte）
+    └── 20261030_2line_nodummy_* # 雙線模式、不送 dummy byte（目前的程式）
+                                 # 20261030 的原始波形見 .sal（用 Logic 2 開啟）
 ```
 
 ## 🛠 編譯與燒錄
@@ -131,13 +153,13 @@ powershell -ExecutionPolicy Bypass -File .\build-day-from-portfolio.ps1 -Day Pha
 | 重點 | 做法與結果 |
 | --- | --- |
 | 先算預期值，再自動比對 | 寫 `spi_compare.py` 從原始碼推算每個 byte，與分析儀匯出逐 byte 比對 7,759 個 byte，並用 `--selftest` 驗證工具本身 |
-| 分清楚是誰出錯 | 分析儀解碼錯 ≠ 裝置收錯：用 OLED 畫面與手動解碼交叉確認，錯誤都來自分析儀 |
+| 分清楚是誰出錯 | 分析儀解碼錯 ≠ 裝置收錯：用 OLED 畫面與手動解碼交叉確認；也要拔掉量測工具再測一次，單線模式的問題是不接 LA 才出現 |
 | 設定頻率 ≠ 實際頻率 | SPI1 時脈 90MHz 只能做 2 的次方分頻，16MHz 設定實際 11.25MHz，已低於 datasheet t_cycle 下限（Table 13-4） |
 | 找出真正的瓶頸 | SCLK 快約 16 倍，byte 週期只快約 1.8 倍：固定軟體開銷才是瓶頸 |
 | 知道量測工具的極限 | 高頻時一個週期取樣點不足，改量多個週期再平均；類比的訊號完整性要靠示波器 |
 
 ## 🔗 與其他 Day / 專案的連結
 
-- **← Day6**：沿用 Day6 的 OLED 接線與 driver，只新增 `oled_set_spi_frequency()`，讓 `01_main.cpp` 能在執行中切換 SPI 頻率
+- **← Day6**：沿用 Day6 的 OLED 接線與 driver，只新增 `oled_set_spi_frequency()`，讓 `01_main.cpp` 能在執行中切換 SPI 頻率；MISO 改 PA_6 的修正與 Day6 相同
 - **← Day4**：延續 UART 除錯訊號固定走 PA_9 的慣例，方便外接邏輯分析儀
 - **→ 後續感測器整合**：「從程式推算預期值 → 匯出解碼結果 → 工具逐 byte 比對」的流程，之後接 LSM6DS3 等感測器時可以沿用

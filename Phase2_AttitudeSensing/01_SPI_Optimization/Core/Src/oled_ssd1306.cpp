@@ -1,7 +1,8 @@
 #include "oled_ssd1306.h"
 
-// Define SPI(MOSI, MISO(NC), SCLK)
-static SPI spi(PA_7, NC, PA_5);
+// SPI(MOSI, MISO, SCLK). MISO = PA_6 (D12, not wired): with NC, mbed uses
+// 1-line SPI and the OLED stays blank unless LA probes are attached.
+static SPI spi(PA_7, PA_6, PA_5);
 static DigitalOut oled_cs(PB_10);
 static DigitalOut oled_dc(PB_1);
 static DigitalOut oled_res(PB_0);
@@ -147,16 +148,9 @@ void oled_init() {
 }
 
 void oled_set_spi_frequency(uint32_t hz) {
-    // Only changes the host's SCLK rate; SSD1306 internal state is untouched,
-    // so no need to re-run oled_init() when switching speeds mid-run.
+    // Only changes the SCLK rate; the OLED keeps its settings, no re-init needed
     spi.frequency(hz);
-
-    // After re-configuring, SCLK is left high until the first transfer, so the
-    // next real byte would start from the wrong idle level (logic analyzer drops
-    // it as "idle state mismatch"). Clock one dummy byte with CS high: the OLED
-    // ignores the bus, and SCLK is back to its Mode 0 idle-low afterwards.
-    oled_cs = 1;                    // DigitalOut defaults to 0, so set it explicitly
-    spi.write(0x00);
+    oled_cs = 1;    // CS starts low (DigitalOut default), so deselect the OLED
 }
 
 void oled_clear() {
