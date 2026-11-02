@@ -3,6 +3,7 @@
 projectfiles
 *.py*
 !Phase2_AttitudeSensing/01_SPI_Optimization/tools/spi_compare.py
+!Phase2_AttitudeSensing/04_Sensor_OLED/tools/timing.py
 BUILD
 compile_commands.json
 .clangd

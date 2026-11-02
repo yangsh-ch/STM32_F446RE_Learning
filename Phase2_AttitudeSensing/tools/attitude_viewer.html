@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LSM6DS3 即時姿態</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Same look as the Phase 2-03 rotation-test page: one column, 3D stage, readouts below */
+:root{
+  --bg:#f7f6f2; --surface:#ffffff; --fg:#26241f; --muted:#6b6860; --line:#dcd9cf;
+  --floor:rgba(150,142,120,.16); --floor-line:#cfcbbf;
+  --accent:#1f5fa8; --accent-bg:#e4eef9; --ok:#2f7d32; --err:#b3261e; --warn:#9a6700;
+  --ax-x:#e0484a; --ax-y:#5f9a23; --ax-z:#3786dc;
+  --font-body:"Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;
+  --font-num:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#1b1a17; --surface:#24231f; --fg:#ecebe6; --muted:#a3a094; --line:#3a3832;
+  --floor:rgba(220,214,195,.08); --floor-line:#4a473f;
+  --accent:#8dbcf0; --accent-bg:#1d3550; --ok:#81c784; --err:#f2b8b5; --warn:#e6c35c; color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#1b1a17; --surface:#24231f; --fg:#ecebe6; --muted:#a3a094; --line:#3a3832;
+  --floor:rgba(220,214,195,.08); --floor-line:#4a473f;
+  --accent:#8dbcf0; --accent-bg:#1d3550; --ok:#81c784; --err:#f2b8b5; --warn:#e6c35c; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:15px;line-height:1.6}
+.page{max-width:760px;margin:0 auto;padding:20px 16px 32px;display:flex;flex-direction:column;gap:16px}
+.page>*{min-width:0}
+h1{font-size:22px;font-weight:700;margin:0}
+.sub{margin:0;color:var(--muted);font-size:14px}
+.ctl{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center}
+.btn{font:500 15px var(--font-body);color:var(--accent);background:var(--accent-bg);border:1px solid var(--accent);border-radius:8px;padding:7px 20px;cursor:pointer}
+.btn.sec{color:var(--fg);background:var(--surface);border-color:var(--line)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn:focus-visible,.seg button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{font:500 15px var(--font-body);color:var(--fg);background:var(--surface);border:0;border-right:1px solid var(--line);padding:7px 14px;cursor:pointer}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--accent-bg);color:var(--accent)}
+.status{font-size:14px;color:var(--muted)}
+.status.ok{color:var(--ok)} .status.err{color:var(--err)} .status.warn{color:var(--warn)}
+.stage{position:relative;height:380px;perspective:1000px;overflow:hidden;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+.scene{position:absolute;left:50%;top:44%;transform-style:preserve-3d;transform:rotateX(-20deg) rotateY(-30deg)}
+.floor{position:absolute;width:340px;height:340px;margin:-170px 0 0 -170px;transform:translateY(105px) rotateX(90deg);background:var(--floor);border:1px solid var(--floor-line);border-radius:12px}
+.spin{position:absolute;transform-style:preserve-3d}
+.f{position:absolute;left:0;top:0;backface-visibility:hidden}
+.ax{position:absolute;left:0;top:-3px;height:6px;transform-origin:0 50%;transform-style:preserve-3d}
+.ax i{position:absolute;inset:0;transform:rotateX(90deg);background:inherit}
+.ax .tip{position:absolute;right:-6px;top:-5px;width:0;height:0;border-top:8px solid transparent;border-bottom:8px solid transparent;border-left:12px solid currentColor}
+.ax .end{position:absolute;right:-22px;top:2px;width:2px;height:2px}
+.lbl{position:absolute;font-family:var(--font-num);font-size:17px;transform:translate(-50%,-50%);pointer-events:none}
+.read{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.chip{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--muted)}
+.chip b{display:block;font-family:var(--font-num);font-weight:500;font-size:19px;color:var(--fg)}
+.chip.off b{color:var(--muted)}
+.raw{margin:0;font-family:var(--font-num);font-size:13px;color:var(--muted);white-space:pre;overflow-x:auto}
+.notes{margin:0;padding-left:20px;color:var(--muted);font-size:14px;display:flex;flex-direction:column;gap:4px}
+@media (max-width:560px){.stage{height:320px}.scene{transform:rotateX(-20deg) rotateY(-30deg) scale(.8)}.read{grid-template-columns:repeat(2,minmax(0,1fr))}}
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>LSM6DS3 即時姿態</h1>
+  <p class="sub">讀取 UART 輸出（115200）。A：只用加速度計，算出 Roll／Pitch。B：加速度計＋陀螺儀（互補濾波），Yaw 也會動，需要 <code>tools/imu_stream</code> 的韌體（約 104 Hz）。</p>
+
+  <div class="ctl">
+    <button type="button" class="btn" id="connect">連線</button>
+    <div class="seg" id="modeSeg"><button type="button" data-v="A">A 加速度計</button><button type="button" data-v="B">B ＋陀螺儀</button></div>
+    <button type="button" class="btn sec" id="calib">重新校正</button>
+    <button type="button" class="btn sec" id="zeroYaw">Yaw 歸零</button>
+  </div>
+  <span class="status" id="status">未連線</span>
+
+  <div class="stage" id="stage">
+    <div class="scene">
+      <div class="floor"></div>
+      <div class="spin" id="spin">
+        <div class="f" style="width:120px;height:150px;margin:-75px 0 0 -60px;transform:translateZ(5px);background:#5B2A86;border-radius:6px">
+          <div style="position:absolute;left:70px;top:6px;width:18px;height:18px;border-radius:50%;background:#e9e3d6"></div>
+          <div style="position:absolute;left:70px;top:126px;width:18px;height:18px;border-radius:50%;background:#e9e3d6"></div>
+          <div style="position:absolute;left:0;top:22px;width:16px;height:106px;background:#1f1f1f"></div>
+          <div style="position:absolute;left:104px;top:28px;width:8px;height:94px;background:repeating-linear-gradient(#c9a64a 0 8px,#2a2a2a 8px 19px)"></div>
+          <div style="position:absolute;left:46px;top:58px;width:24px;height:24px;background:#222;border-radius:2px"></div>
+          <div style="position:absolute;left:22px;top:118px;font-size:12px;line-height:1.1;color:#fff;font-weight:700">LSM<br>6DS3</div>
+        </div>
+        <div class="f" style="width:120px;height:150px;margin:-75px 0 0 -60px;transform:rotateY(180deg) translateZ(5px);background:#3d1d5c;border-radius:6px"></div>
+        <div class="f" style="width:120px;height:10px;margin:-5px 0 0 -60px;transform:rotateX(90deg) translateZ(75px);background:#2e1546"></div>
+        <div class="f" style="width:120px;height:10px;margin:-5px 0 0 -60px;transform:rotateX(-90deg) translateZ(75px);background:#2e1546"></div>
+        <div class="f" style="width:10px;height:150px;margin:-75px 0 0 -5px;transform:rotateY(-90deg) translateZ(60px);background:#2e1546"></div>
+        <div class="f" style="width:10px;height:150px;margin:-75px 0 0 -5px;transform:rotateY(90deg) translateZ(60px);background:#2e1546"></div>
+        <div class="ax" data-a="X" style="width:120px;transform:rotateZ(-90deg);background:var(--ax-x);color:var(--ax-x)"><i></i><span class="tip"></span><span class="end"></span></div>
+        <div class="ax" data-a="Y" style="width:110px;transform:rotateZ(180deg);background:var(--ax-y);color:var(--ax-y)"><i></i><span class="tip"></span><span class="end"></span></div>
+        <div class="ax" data-a="Z" style="width:100px;transform:rotateY(-90deg);background:var(--ax-z);color:var(--ax-z)"><i></i><span class="tip"></span><span class="end"></span></div>
+      </div>
+    </div>
+    <span class="lbl" id="lblX" style="color:var(--ax-x)">+X</span>
+    <span class="lbl" id="lblY" style="color:var(--ax-y)">+Y</span>
+    <span class="lbl" id="lblZ" style="color:var(--ax-z)">+Z</span>
+  </div>
+
+  <div class="read">
+    <div class="chip">Roll（繞 X）<b id="roll">—</b></div>
+    <div class="chip">Pitch（繞 Y）<b id="pitch">—</b></div>
+    <div class="chip" id="yawChip">Yaw（繞垂直軸）<b id="yaw">—</b></div>
+    <div class="chip">|a|<b id="mag">—</b></div>
+    <div class="chip">更新頻率<b id="rate">—</b></div>
+  </div>
+  <p class="raw" id="raw">A[mg]  —  G[mdps]  —</p>
+  <p class="raw" id="bias">陀螺儀零點偏移 [mdps]  —</p>
+
+  <ul class="notes">
+    <li>同一個 COM port 只能給一個程式開：連線前先關掉 serial-monitor.ps1 或其他序列埠工具</li>
+    <li>A：Roll = atan2(ay, az)，Pitch = atan2(−ax, √(ay² + az²))；X 軸朝正上或正下時 Roll 沒有定義</li>
+    <li>B：陀螺儀積分算出轉動，加速度計把 Roll／Pitch 慢慢拉回正確值（Mahony 互補濾波，Kp = 1）；Yaw 沒有參考可以修正，會慢慢漂移，可以按「Yaw 歸零」</li>
+    <li>B 開始時（連線後、按「重新校正」後）會先取 2 秒的陀螺儀平均當作零點偏移，這段時間要讓感測器靜止</li>
+    <li>轉動或晃動時，加速度計也會量到運動本身的加速度；|a| 偏離 1000 mg 超過 20% 時，B 只用陀螺儀</li>
+  </ul>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const stage = $('stage'), spin = $('spin');
+// "T[us] <t> " is printed by tools/imu_stream; Phase 2-04 prints only the A/G part
+const LINE = /(?:T\[us\]\s+(\d+)\s+)?A\[mg\]\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+G\[mdps\]\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)/;
+const DEG = 180 / Math.PI;
+
+// ---- frames ----
+// World (right-handed): Zw up. R maps sensor -> world.
+// CSS: x right, y down, z toward the viewer.
+// V0: world -> CSS (Xw away from viewer, Yw to the left, Zw up), matching the 2-03 page's "flat" pose.
+// S : sensor -> CSS for the model as drawn (+X up the board face, +Y to the left, +Z out of the face).
+// Model transform T = V0 * R * S^T.
+const V0 = [[0,-1,0],[0,0,-1],[-1,0,0]];
+const ST = [[0,-1,0],[-1,0,0],[0,0,1]];
+const mul = (A, B) => A.map(r => [0,1,2].map(j => r[0]*B[0][j] + r[1]*B[1][j] + r[2]*B[2][j]));
+
+function cssMatrix(R) {
+  const T = mul(mul(V0, R), ST);
+  // matrix3d is column-major
+  return 'matrix3d(' + [T[0][0],T[1][0],T[2][0],0, T[0][1],T[1][1],T[2][1],0, T[0][2],T[1][2],T[2][2],0, 0,0,0,1].join(',') + ')';
+}
+
+// ---- quaternion helpers: q = [w, x, y, z], sensor -> world ----
+function qNorm(q) { const n = Math.hypot(...q) || 1; return q.map(c => c / n); }
+function qMul(a, b) {
+  return [a[0]*b[0] - a[1]*b[1] - a[2]*b[2] - a[3]*b[3],
+          a[0]*b[1] + a[1]*b[0] + a[2]*b[3] - a[3]*b[2],
+          a[0]*b[2] - a[1]*b[3] + a[2]*b[0] + a[3]*b[1],
+          a[0]*b[3] + a[1]*b[2] - a[2]*b[1] + a[3]*b[0]];
+}
+function qToR([w, x, y, z]) {
+  return [[1 - 2*(y*y + z*z), 2*(x*y - w*z),     2*(x*z + w*y)],
+          [2*(x*y + w*z),     1 - 2*(x*x + z*z), 2*(y*z - w*x)],
+          [2*(x*z - w*y),     2*(y*z + w*x),     1 - 2*(x*x + y*y)]];
+}
+// Tilt from gravity, yaw = 0: R = Ry(pitch) * Rx(roll)
+function tiltAngles([x, y, z]) { return [Math.atan2(y, z), Math.atan2(-x, Math.hypot(y, z))]; }
+function qFromTilt(roll, pitch, yaw = 0) {
+  const qx = [Math.cos(roll / 2), Math.sin(roll / 2), 0, 0];
+  const qy = [Math.cos(pitch / 2), 0, Math.sin(pitch / 2), 0];
+  const qz = [Math.cos(yaw / 2), 0, 0, Math.sin(yaw / 2)];
+  return qMul(qz, qMul(qy, qx));
+}
+function eulerZYX(R) { return [Math.atan2(R[2][1], R[2][2]), Math.asin(Math.max(-1, Math.min(1, -R[2][0]))), Math.atan2(R[1][0], R[0][0])]; }
+
+// ---- state ----
+let mode = 'B';
+let have = false;
+let aUnit = [0, 0, 1];            // latest accel direction
+let gA = [0, 0, 1];               // mode A: low-passed gravity direction (2-04 prints at ~9 Hz)
+const TAU_A = 0.12;               // seconds
+let q = [1, 0, 0, 0];             // mode B orientation
+const KP = 1.0;                   // Mahony proportional gain [1/s]
+const CALIB_N = 200;              // ~2 s at 104 Hz
+let calib = null, bias = null;    // calib = {n, sum[3]} while collecting
+let lastT = null, lastArrive = null;
+const stamps = [];
+
+function setStatus(text, cls) { const s = $('status'); s.textContent = text; s.className = 'status' + (cls ? ' ' + cls : ''); }
+
+function startCalib() {
+  calib = { n: 0, sum: [0, 0, 0] };
+  bias = null;
+  setStatus('B 校正中：請讓感測器靜止 2 秒…', 'warn');
+}
+
+function stepB(a, gyroMdps, dt) {
+  if (!bias) return;
+  // rad/s, bias removed
+  let w = gyroMdps.map((g, i) => (g - bias[i]) / 1000 / DEG);
+  const n = Math.hypot(...a);
+  if (n > 800 && n < 1200) {
+    const u = a.map(c => c / n);
+    // estimated "up" in the sensor frame = R^T * (0,0,1)
+    const [qw, qx, qy, qz] = q;
+    const v = [2*(qx*qz - qw*qy), 2*(qw*qx + qy*qz), qw*qw - qx*qx - qy*qy + qz*qz];
+    const e = [u[1]*v[2] - u[2]*v[1], u[2]*v[0] - u[0]*v[2], u[0]*v[1] - u[1]*v[0]];
+    w = w.map((c, i) => c + KP * e[i]);
+  }
+  const dq = qMul(q, [0, w[0], w[1], w[2]]);
+  q = qNorm(q.map((c, i) => c + 0.5 * dq[i] * dt));
+}
+
+function handleLine(line) {
+  const m = LINE.exec(line);
+  if (!m) return;
+  const t = m[1] !== undefined ? Number(m[1]) : null;
+  const a = m.slice(2, 5).map(Number), g = m.slice(5, 8).map(Number);
+  const n = Math.hypot(...a);
+  if (n < 1) return;
+  const now = performance.now();
+
+  // sample interval: MCU timestamp when present (u32 us, may wrap), else arrival time
+  let dt;
+  if (t !== null && lastT !== null) dt = (((t - lastT) % 4294967296) + 4294967296) % 4294967296 / 1e6;
+  else if (lastArrive !== null) dt = (now - lastArrive) / 1000;
+  else dt = 0;
+  dt = Math.min(dt, 0.2);
+  lastT = t; lastArrive = now;
+
+  aUnit = a.map(c => c / n);
+  if (!have) {
+    gA = aUnit.slice();
+    q = qFromTilt(...tiltAngles(aUnit));
+    have = true;
+    startCalib();
+  }
+
+  if (calib) {
+    calib.n++;
+    calib.sum = calib.sum.map((s, i) => s + g[i]);
+    if (calib.n >= CALIB_N) {
+      bias = calib.sum.map(s => s / calib.n);
+      calib = null;
+      q = qFromTilt(...tiltAngles(aUnit));
+      $('bias').textContent = '陀螺儀零點偏移 [mdps] ' + bias.map(b => b.toFixed(0).padStart(7)).join('');
+      setStatus(t === null ? '已連線（沒有時間戳記：B 用到達時間積分，比較不準，建議燒 imu_stream）' : '已連線', t === null ? 'warn' : 'ok');
+    }
+  } else {
+    stepB(a, g, dt);
+  }
+
+  $('mag').textContent = n.toFixed(0) + ' mg';
+  $('raw').textContent = 'A[mg] ' + a.map(x => String(x).padStart(6)).join('') +
+                         '   G[mdps] ' + g.map(x => String(x).padStart(8)).join('');
+  stamps.push(now);
+  while (stamps.length && now - stamps[0] > 2000) stamps.shift();
+}
+window.feedLine = handleLine;           // debugging hook: feedLine('T[us] 0 A[mg] 0 0 1000 G[mdps] 0 0 0')
+
+function place() {
+  const sr = stage.getBoundingClientRect();
+  document.querySelectorAll('.ax').forEach(a => {
+    const r = a.querySelector('.end').getBoundingClientRect(), l = $('lbl' + a.dataset.a);
+    l.style.left = (r.left + r.width / 2 - sr.left) + 'px';
+    l.style.top = (r.top + r.height / 2 - sr.top) + 'px';
+  });
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(now - last, 100) / 1000; last = now;
+  let R, yawShown;
+  if (mode === 'A' || !bias) {
+    const k = 1 - Math.exp(-dt / TAU_A);
+    gA = gA.map((x, i) => x + (aUnit[i] - x) * k);
+    const [roll, pitch] = tiltAngles(gA);
+    R = qToR(qFromTilt(roll, pitch));
+    yawShown = mode === 'B';             // B still calibrating: show tilt only
+  } else {
+    R = qToR(q);
+    yawShown = true;
+  }
+  spin.style.transform = cssMatrix(R);
+  if (have) {
+    const [roll, pitch, yaw] = eulerZYX(R);
+    $('roll').textContent = (roll * DEG).toFixed(1) + '°';
+    $('pitch').textContent = (pitch * DEG).toFixed(1) + '°';
+    $('yaw').textContent = mode === 'B' && bias ? (yaw * DEG).toFixed(1) + '°' : '—';
+    $('rate').textContent = stamps.length > 1
+      ? ((stamps.length - 1) * 1000 / (stamps[stamps.length - 1] - stamps[0])).toFixed(1) + ' Hz' : '—';
+  }
+  $('yawChip').classList.toggle('off', !(mode === 'B' && bias));
+  place();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// ---- controls ----
+function renderMode() {
+  [...$('modeSeg').children].forEach(b => b.classList.toggle('on', b.dataset.v === mode));
+  $('calib').disabled = $('zeroYaw').disabled = mode !== 'B';
+}
+$('modeSeg').onclick = e => { const v = e.target.dataset && e.target.dataset.v; if (!v) return; mode = v; renderMode(); };
+$('calib').onclick = () => { if (have) startCalib(); };
+$('zeroYaw').onclick = () => { if (bias) { const [roll, pitch] = eulerZYX(qToR(q)); q = qFromTilt(roll, pitch); } };
+renderMode();
+
+// ---- Web Serial ----
+let port = null, reader = null;
+
+async function connect() {
+  try {
+    port = await navigator.serial.requestPort();
+    await port.open({ baudRate: 115200, bufferSize: 16384 });
+  } catch (e) {
+    port = null;
+    setStatus(e.name === 'NotFoundError' ? '沒有選擇 COM port' : '無法開啟：' + e.message + '（COM port 是否被其他程式佔用？）', 'err');
+    return;
+  }
+  have = false; calib = null; bias = null; lastT = null; lastArrive = null;
+  $('bias').textContent = '陀螺儀零點偏移 [mdps]  —';
+  const dec = new TextDecoderStream();
+  const piped = port.readable.pipeTo(dec.writable).catch(() => {});
+  reader = dec.readable.getReader();
+  $('connect').textContent = '中斷連線';
+  setStatus('已連線，等待資料…', 'ok');
+  let buf = '';
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += value;
+      let i;
+      while ((i = buf.indexOf('\n')) >= 0) { handleLine(buf.slice(0, i)); buf = buf.slice(i + 1); }
+    }
+    setStatus('未連線');
+  } catch (e) {
+    setStatus('連線中斷：' + e.message, 'err');
+  } finally {
+    reader.releaseLock(); reader = null;
+    await piped;
+    try { await port.close(); } catch (_) {}
+    port = null;
+    $('connect').textContent = '連線';
+  }
+}
+
+$('connect').onclick = () => {
+  if (!('serial' in navigator)) { setStatus('這個瀏覽器不支援 Web Serial，請用 Chrome 或 Edge 開啟', 'err'); return; }
+  if (reader) reader.cancel(); else connect();
+};
+</script>
+</body>
+</html>
