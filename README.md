@@ -68,7 +68,7 @@ STM32_F446RE_Learning/
 
 | Module | Finding | How it was verified |
 | --- | --- | --- |
-| Day 5 | Button latency of 140~200ms came from mechanical bounce + Mbed OS debounce, not the ISR; a digital loopback responds in **10~50µs** | Logic analyzer |
+| Day 5 | Button latency of 140–200ms came from mechanical bounce + Mbed OS debounce, not the ISR; a digital loopback responds in **10–50µs** | Logic analyzer |
 | Phase 2-01 | All 7,759 SPI bytes reached the OLED correctly; the 16MHz setting actually runs at 11.25MHz, below the SSD1306 t_cycle minimum | Byte-by-byte compare tool (`spi_compare.py`) |
 | Phase 2-02 | `WHO_AM_I` read 0x00 because the NACKed last scan probe left the I2C AF flag set; clearing it fixed the next transfer | Before/after captures + mbed/HAL source |
 | Phase 2-03 | Accel/gyro conversion validated against gravity: sensitivity error < 0.5%, offsets ≤ 14 mg | Six-orientation test + manual decode of a 12-byte burst |
