@@ -50,7 +50,7 @@ STM32_F446RE_Learning/
 | 02 | I2C + LSM6DS3 (6-axis IMU) | ✅ Done — see [Phase2_AttitudeSensing/02_I2C_LSM6DS3](Phase2_AttitudeSensing/02_I2C_LSM6DS3/02_README.md) |
 | 03 | Sensor data processing (raw → mg/mdps) | ✅ Done — see [Phase2_AttitudeSensing/03_Sensor_Processing](Phase2_AttitudeSensing/03_Sensor_Processing/03_README.md) |
 | 04 | Sensor + OLED integration | ✅ Done — see [Phase2_AttitudeSensing/04_Sensor_OLED](Phase2_AttitudeSensing/04_Sensor_OLED/04_README.md) |
-| 05 | Tilt/attitude meter | ⏳ Planned |
+| 05 | Tilt meter + OLED bubble level | ✅ Done — see [Phase2_AttitudeSensing/05_Tilt_Meter](Phase2_AttitudeSensing/05_Tilt_Meter/05_README.md) |
 | 06 | TTP223 touch UI (page switching) | ⏳ Planned |
 | 07 | SPI DMA optimization | ⏳ Planned |
 | 08 | FreeRTOS (multi-task) | ⏳ Planned |
@@ -73,6 +73,7 @@ STM32_F446RE_Learning/
 | Phase 2-02 | `WHO_AM_I` read 0x00 because the NACKed last scan probe left the I2C AF flag set; clearing it fixed the next transfer | Before/after captures + mbed/HAL source |
 | Phase 2-03 | Accel/gyro conversion validated against gravity: sensitivity error < 0.5%, offsets ≤ 14 mg | Six-orientation test + manual decode of a 12-byte burst |
 | Phase 2-04 | The OLED failed only without the logic analyzer (since Day 6): with MISO = NC, mbed uses 1-line SPI and adds a narrow SCLK pulse that shifts every byte by one bit; an unused MISO pin fixed it. One OLED refresh takes **6.97 ms** of a 108 ms loop | Received commands predicted from the bit shift + I²C/SPI timing capture (`timing.py`) |
+| Phase 2-05 | Accelerometer-only tilt matched an iPad inclinometer within **1°** on both axes (noise ±0.1°); Roll jitters 2–3° when X is near vertical. The bubble level is drawn in a 64×64 RAM framebuffer and sent as one windowed 512-byte block: **6.33 ms** per OLED refresh, 58 ms loop | Six-orientation test + phyphox comparison + I²C/SPI timing capture (`timing.py`) |
 
 ## 🔗 Detailed Learning Notes
 
