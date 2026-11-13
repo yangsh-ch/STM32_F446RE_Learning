@@ -13,7 +13,7 @@ Bridge from communication-layer firmware (UART/PCIe/I2C) to **digital power cont
 | --- | --- | --- |
 | MCU Board | NUCLEO-F446RE (Cortex-M4 @ 180MHz) | Main controller |
 | IMU Module | GY-LSM6DS3 (6-axis accel + gyro, I²C) | Attitude sensing (Phase 2) |
-| OLED Display | SSD1306 128×64 (SPI) | Text / data display (Day 6, Phase 2) |
+| OLED Display | SSD1306 128×64 (SPI) | Text / graphics display (Day 6, Phase 2) |
 | Logic Analyzer | 8-channel, 24 MS/s | Signal verification & timing measurement |
 
 ## 📁 Repository Structure
